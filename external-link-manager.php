@@ -78,6 +78,10 @@ function elm_init() {
 		$settings = new ELM_Settings();
 		$settings->init();
 
+		require_once ELM_PLUGIN_DIR . 'includes/class-elm-import-export.php';
+		$import_export = new ELM_Import_Export();
+		$import_export->init();
+
 		require_once ELM_PLUGIN_DIR . 'admin/class-elm-admin.php';
 		$admin = new ELM_Admin();
 		$admin->init();

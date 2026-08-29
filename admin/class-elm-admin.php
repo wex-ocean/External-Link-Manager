@@ -78,6 +78,45 @@ class ELM_Admin {
 	 * Process list table bulk and row actions early, before headers are sent.
 	 */
 	public function process_list_table_actions() {
+		// Handle override form submission.
+		if ( isset( $_POST['action'] ) && 'save_override' === $_POST['action'] && isset( $_POST['link_id'] ) ) {
+			if ( wp_verify_nonce( $_POST['elm_save_override_nonce'], 'elm_save_override_' . intval( $_POST['link_id'] ) ) && current_user_can( 'manage_options' ) ) {
+				$link_id = absint( $_POST['link_id'] );
+				
+				if ( isset( $_POST['reset_to_global'] ) ) {
+					$attributes_json = null;
+				} else {
+					$override = array(
+						'open_new_tab' => ! empty( $_POST['elm_override']['open_new_tab'] ),
+						'nofollow'     => ! empty( $_POST['elm_override']['nofollow'] ),
+						'sponsored'    => ! empty( $_POST['elm_override']['sponsored'] ),
+						'ugc'          => ! empty( $_POST['elm_override']['ugc'] ),
+						'noopener'     => ! empty( $_POST['elm_override']['noopener'] ),
+						'noreferrer'   => ! empty( $_POST['elm_override']['noreferrer'] ),
+						'custom_class' => isset( $_POST['elm_override']['custom_class'] ) ? sanitize_text_field( $_POST['elm_override']['custom_class'] ) : '',
+					);
+					$attributes_json = wp_json_encode( $override );
+				}
+
+				require_once ELM_PLUGIN_DIR . 'includes/class-elm-db.php';
+				ELM_DB::update_link( $link_id, array( 'attributes_json' => $attributes_json ) );
+
+				// Invalidate cache
+				global $wpdb;
+				$table = ELM_DB::table_name();
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$post_id = $wpdb->get_var( $wpdb->prepare( "SELECT post_id FROM `{$table}` WHERE id = %d", $link_id ) );
+				if ( $post_id ) {
+					require_once ELM_PLUGIN_DIR . 'includes/class-elm-cache.php';
+					ELM_Cache::invalidate_post( $post_id );
+				}
+
+				$redirect_url = admin_url( 'admin.php?page=elm-dashboard' );
+				wp_safe_redirect( $redirect_url );
+				exit;
+			}
+		}
+
 		require_once ELM_PLUGIN_DIR . 'admin/class-elm-list-table.php';
 		$list_table = new ELM_List_Table();
 		$list_table->process_bulk_action();
@@ -88,6 +127,12 @@ class ELM_Admin {
 	 */
 	public function display_plugin_dashboard_page() {
 		require_once ELM_PLUGIN_DIR . 'admin/class-elm-list-table.php';
+
+		if ( isset( $_GET['action'] ) && 'override_attributes' === $_GET['action'] && ! empty( $_GET['link_id'] ) ) {
+			require_once ELM_PLUGIN_DIR . 'admin/views/override.php';
+			return;
+		}
+
 		require_once ELM_PLUGIN_DIR . 'admin/views/dashboard.php';
 	}
 
