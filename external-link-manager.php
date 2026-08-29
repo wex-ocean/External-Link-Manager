@@ -48,7 +48,6 @@ register_deactivation_hook( ELM_PLUGIN_FILE, 'elm_deactivate' );
 
 /**
  * Bootstrap the plugin after all plugins are loaded.
- * Feature classes are loaded here in future stages.
  */
 function elm_init() {
 	// Load text domain for i18n.
@@ -58,6 +57,14 @@ function elm_init() {
 		dirname( ELM_PLUGIN_BASENAME ) . '/languages'
 	);
 
-	// Future stages: instantiate detector, renderer, admin, settings, etc.
+	// --- Load core classes ---
+	require_once ELM_PLUGIN_DIR . 'includes/class-elm-db.php';
+	require_once ELM_PLUGIN_DIR . 'includes/class-elm-detector.php';
+
+	// --- Detection layer: scan post content on save ---
+	$detector = new ELM_Detector();
+	$detector->init();
+
+	// Future stages: renderer, admin, settings, etc.
 }
 add_action( 'plugins_loaded', 'elm_init' );
