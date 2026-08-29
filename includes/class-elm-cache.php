@@ -151,15 +151,20 @@ class ELM_Cache {
 	 * @return void
 	 */
 	public static function invalidate_aggregates() {
-		$aggregate_keys = array(
-			'dashboard_total_count',
-			'dashboard_domain_counts',
-		);
+		global $wpdb;
+		
+		// Flush the entire object cache group where supported.
+		wp_cache_flush_group( self::GROUP );
 
-		foreach ( $aggregate_keys as $key ) {
-			wp_cache_delete( $key, self::GROUP );
-			delete_transient( 'elm_' . $key );
-		}
+		// Clear transients for dashboard queries.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query(
+			"DELETE FROM `{$wpdb->options}` WHERE `option_name` LIKE '_transient_elm_dashboard_%'" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query(
+			"DELETE FROM `{$wpdb->options}` WHERE `option_name` LIKE '_transient_timeout_elm_dashboard_%'" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
 	}
 
 	// ------------------------------------------------------------------
@@ -187,5 +192,67 @@ class ELM_Cache {
 		self::set( $key, $links );
 
 		return $links;
+	}
+
+	/**
+	 * Get paginated, sorted, filtered dashboard links with caching.
+	 *
+	 * @param array $args Query arguments.
+	 * @return array Array of link row objects.
+	 */
+	public static function get_dashboard_links( $args = array() ) {
+		// Generate a unique hash for the query arguments.
+		$args_hash = md5( serialize( $args ) );
+		$key       = 'dashboard_links_' . $args_hash;
+		$cached    = self::get( $key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$links = ELM_DB::get_dashboard_links( $args );
+		self::set( $key, $links );
+
+		return $links;
+	}
+
+	/**
+	 * Get total count for dashboard pagination with caching.
+	 *
+	 * @param array $args Query arguments.
+	 * @return int Total count.
+	 */
+	public static function get_dashboard_count( $args = array() ) {
+		$args_hash = md5( serialize( $args ) );
+		$key       = 'dashboard_count_' . $args_hash;
+		$cached    = self::get( $key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$count = ELM_DB::get_dashboard_count( $args );
+		self::set( $key, $count );
+
+		return $count;
+	}
+
+	/**
+	 * Get distinct domains with caching.
+	 *
+	 * @return array Array of domains.
+	 */
+	public static function get_distinct_domains() {
+		$key    = 'dashboard_distinct_domains';
+		$cached = self::get( $key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$domains = ELM_DB::get_distinct_domains();
+		self::set( $key, $domains );
+
+		return $domains;
 	}
 }

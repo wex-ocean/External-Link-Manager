@@ -242,6 +242,38 @@ class ELM_DB {
 	}
 
 	/**
+	 * Update specific fields for an existing link row.
+	 *
+	 * @param int   $id   Row primary key.
+	 * @param array $data Data to update.
+	 * @return int|false
+	 */
+	public static function update_link( $id, $data ) {
+		global $wpdb;
+
+		$data['updated_at'] = current_time( 'mysql', true );
+
+		// Create formats array assuming strings, unless we know it's an int.
+		$formats = array();
+		foreach ( $data as $key => $value ) {
+			if ( 'is_excluded' === $key || 'post_id' === $key ) {
+				$formats[] = '%d';
+			} else {
+				$formats[] = '%s';
+			}
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->update(
+			self::table_name(),
+			$data,
+			array( 'id' => absint( $id ) ),
+			$formats,
+			array( '%d' )
+		);
+	}
+
+	/**
 	 * Delete all links for a given post (used when a post is trashed/deleted).
 	 *
 	 * @param int $post_id Post ID.
@@ -255,5 +287,130 @@ class ELM_DB {
 			array( 'post_id' => absint( $post_id ) ),
 			array( '%d' )
 		);
+	}
+
+	// ------------------------------------------------------------------
+	// Dashboard / WP_List_Table queries
+	// ------------------------------------------------------------------
+
+	/**
+	 * Get links for the dashboard list table with filtering, sorting, and pagination.
+	 *
+	 * @param array $args Query arguments (per_page, offset, orderby, order, domain, post_id, search).
+	 * @return array Array of row objects.
+	 */
+	public static function get_dashboard_links( $args = array() ) {
+		global $wpdb;
+
+		$table = self::table_name();
+		
+		$defaults = array(
+			'per_page' => 20,
+			'offset'   => 0,
+			'orderby'  => 'detected_at',
+			'order'    => 'DESC',
+			'domain'   => '',
+			'post_id'  => 0,
+			'search'   => '',
+		);
+		$args = wp_parse_args( $args, $defaults );
+
+		$where = array( '1=1' );
+		$query_args = array();
+
+		if ( ! empty( $args['domain'] ) ) {
+			$where[] = 'domain = %s';
+			$query_args[] = $args['domain'];
+		}
+
+		if ( ! empty( $args['post_id'] ) ) {
+			$where[] = 'post_id = %d';
+			$query_args[] = absint( $args['post_id'] );
+		}
+
+		if ( ! empty( $args['search'] ) ) {
+			$where[] = '(url LIKE %s OR anchor_text LIKE %s)';
+			$like = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+			$query_args[] = $like;
+			$query_args[] = $like;
+		}
+
+		$where_sql = implode( ' AND ', $where );
+
+		// Whitelist orderby to prevent SQLi.
+		$allowed_orderby = array( 'url', 'domain', 'post_id', 'detected_at' );
+		$orderby = in_array( $args['orderby'], $allowed_orderby, true ) ? $args['orderby'] : 'detected_at';
+		$order   = strtoupper( $args['order'] ) === 'ASC' ? 'ASC' : 'DESC';
+
+		$query_args[] = absint( $args['per_page'] );
+		$query_args[] = absint( $args['offset'] );
+
+		$sql = "SELECT * FROM `{$table}` WHERE {$where_sql} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results( $wpdb->prepare( $sql, $query_args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
+	 * Get total count of links matching the given filters (for pagination).
+	 *
+	 * @param array $args Query arguments (domain, post_id, search).
+	 * @return int Total count.
+	 */
+	public static function get_dashboard_count( $args = array() ) {
+		global $wpdb;
+
+		$table = self::table_name();
+		
+		$defaults = array(
+			'domain'  => '',
+			'post_id' => 0,
+			'search'  => '',
+		);
+		$args = wp_parse_args( $args, $defaults );
+
+		$where = array( '1=1' );
+		$query_args = array();
+
+		if ( ! empty( $args['domain'] ) ) {
+			$where[] = 'domain = %s';
+			$query_args[] = $args['domain'];
+		}
+
+		if ( ! empty( $args['post_id'] ) ) {
+			$where[] = 'post_id = %d';
+			$query_args[] = absint( $args['post_id'] );
+		}
+
+		if ( ! empty( $args['search'] ) ) {
+			$where[] = '(url LIKE %s OR anchor_text LIKE %s)';
+			$like = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+			$query_args[] = $like;
+			$query_args[] = $like;
+		}
+
+		$where_sql = implode( ' AND ', $where );
+
+		if ( empty( $query_args ) ) {
+			$sql = "SELECT COUNT(id) FROM `{$table}` WHERE {$where_sql}";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			return (int) $wpdb->get_var( $sql );
+		}
+
+		$sql = "SELECT COUNT(id) FROM `{$table}` WHERE {$where_sql}";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $query_args ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
+	 * Get distinct domains for the filter dropdown.
+	 *
+	 * @return array Array of domain strings.
+	 */
+	public static function get_distinct_domains() {
+		global $wpdb;
+		$table = self::table_name();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $wpdb->get_col( "SELECT DISTINCT domain FROM `{$table}` ORDER BY domain ASC" );
 	}
 }

@@ -60,6 +60,9 @@ class ELM_Admin {
 			array( $this, 'display_plugin_dashboard_page' )
 		);
 
+		// Process list table actions before headers are sent.
+		add_action( "load-{$this->plugin_screen_hook_suffix}", array( $this, 'process_list_table_actions' ) );
+
 		// Submenu: Settings.
 		add_submenu_page(
 			'elm-dashboard',
@@ -72,9 +75,19 @@ class ELM_Admin {
 	}
 
 	/**
+	 * Process list table bulk and row actions early, before headers are sent.
+	 */
+	public function process_list_table_actions() {
+		require_once ELM_PLUGIN_DIR . 'admin/class-elm-list-table.php';
+		$list_table = new ELM_List_Table();
+		$list_table->process_bulk_action();
+	}
+
+	/**
 	 * Render the dashboard view.
 	 */
 	public function display_plugin_dashboard_page() {
+		require_once ELM_PLUGIN_DIR . 'admin/class-elm-list-table.php';
 		require_once ELM_PLUGIN_DIR . 'admin/views/dashboard.php';
 	}
 

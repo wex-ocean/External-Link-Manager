@@ -15,5 +15,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 <div class="wrap">
 	<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
-	<p><?php esc_html_e( 'Dashboard view — implementation added in Stage 5.', 'external-link-manager' ); ?></p>
+	
+	<form id="elm-links-filter" method="get">
+		<input type="hidden" name="page" value="<?php echo esc_attr( $_REQUEST['page'] ); ?>" />
+		<?php
+		$list_table = new ELM_List_Table();
+		$list_table->prepare_items();
+		
+		$list_table->search_box( __( 'Search Links', 'external-link-manager' ), 'elm' );
+		$list_table->display();
+		?>
+	</form>
 </div>
