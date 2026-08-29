@@ -84,7 +84,16 @@ class ELM_Detector {
 			return;
 		}
 
-		// 5. Scan content and sync to DB.
+		// 5. Check global exclusions.
+		if ( ELM_Exclusions::is_post_type_excluded( $post->post_type ) || ELM_Exclusions::is_post_id_excluded( $post_id ) ) {
+			// If excluded, we might want to prune existing links?
+			// The plan says "skip excluded posts/domains/post types entirely".
+			// If we return, we don't prune. But maybe we should delete links if they exist?
+			// Let's just return to skip processing as per "skip excluded ... entirely".
+			return;
+		}
+
+		// 6. Scan content and sync to DB.
 		$this->scan_and_sync( $post_id, $post->post_content );
 	}
 
@@ -168,6 +177,11 @@ class ELM_Detector {
 
 			// Compare against home host — if same, it's internal.
 			if ( $this->is_same_host( $link_host, $home_host ) ) {
+				continue;
+			}
+
+			// Skip excluded URLs or domains.
+			if ( ELM_Exclusions::is_url_excluded( $href ) ) {
 				continue;
 			}
 

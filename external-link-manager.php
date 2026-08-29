@@ -60,6 +60,7 @@ function elm_init() {
 	// --- Load core classes ---
 	require_once ELM_PLUGIN_DIR . 'includes/class-elm-db.php';
 	require_once ELM_PLUGIN_DIR . 'includes/class-elm-cache.php';
+	require_once ELM_PLUGIN_DIR . 'includes/class-elm-exclusions.php';
 	require_once ELM_PLUGIN_DIR . 'includes/class-elm-detector.php';
 	require_once ELM_PLUGIN_DIR . 'includes/class-elm-renderer.php';
 
@@ -71,6 +72,17 @@ function elm_init() {
 	$renderer = new ELM_Renderer();
 	$renderer->init();
 
-	// Future stages: admin, settings, etc.
+	// --- Admin and Settings layer ---
+	if ( is_admin() ) {
+		require_once ELM_PLUGIN_DIR . 'includes/class-elm-settings.php';
+		$settings = new ELM_Settings();
+		$settings->init();
+
+		require_once ELM_PLUGIN_DIR . 'admin/class-elm-admin.php';
+		$admin = new ELM_Admin();
+		$admin->init();
+	}
+
+	// Future stages: dashboard etc.
 }
 add_action( 'plugins_loaded', 'elm_init' );

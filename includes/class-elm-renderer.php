@@ -75,6 +75,11 @@ class ELM_Renderer {
 			return $content;
 		}
 
+		// Check global exclusions.
+		if ( class_exists( 'ELM_Exclusions' ) && ( ELM_Exclusions::is_post_type_excluded( $post->post_type ) || ELM_Exclusions::is_post_id_excluded( $post->ID ) ) ) {
+			return $content;
+		}
+
 		// Fetch this post's detected link rows (single cached query).
 		$links = ELM_Cache::get_post_links( $post->ID );
 		if ( empty( $links ) ) {
@@ -110,6 +115,11 @@ class ELM_Renderer {
 			// Hash the href and check if it's one of our tracked external links.
 			$hash = md5( $href );
 			if ( ! isset( $link_map[ $hash ] ) ) {
+				continue;
+			}
+
+			// Check global URL exclusions on the fly to handle cached rows that might now be excluded.
+			if ( class_exists( 'ELM_Exclusions' ) && ELM_Exclusions::is_url_excluded( $href ) ) {
 				continue;
 			}
 
