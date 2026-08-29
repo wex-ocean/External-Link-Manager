@@ -59,12 +59,18 @@ function elm_init() {
 
 	// --- Load core classes ---
 	require_once ELM_PLUGIN_DIR . 'includes/class-elm-db.php';
+	require_once ELM_PLUGIN_DIR . 'includes/class-elm-cache.php';
 	require_once ELM_PLUGIN_DIR . 'includes/class-elm-detector.php';
+	require_once ELM_PLUGIN_DIR . 'includes/class-elm-renderer.php';
 
 	// --- Detection layer: scan post content on save ---
 	$detector = new ELM_Detector();
 	$detector->init();
 
-	// Future stages: renderer, admin, settings, etc.
+	// --- Rendering layer: apply attributes on frontend ---
+	$renderer = new ELM_Renderer();
+	$renderer->init();
+
+	// Future stages: admin, settings, etc.
 }
 add_action( 'plugins_loaded', 'elm_init' );

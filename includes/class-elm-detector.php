@@ -100,6 +100,7 @@ class ELM_Detector {
 		}
 
 		ELM_DB::delete_links_by_post( $post_id );
+		ELM_Cache::invalidate_post( $post_id );
 	}
 
 	// ------------------------------------------------------------------
@@ -217,6 +218,7 @@ class ELM_Detector {
 		$existing = ELM_DB::get_hashes_for_post( $post_id );
 
 		$detected_hashes = array_keys( $detected );
+		$has_changes     = false;
 
 		// --- Insert new links ---
 		foreach ( $detected as $hash => $link_data ) {
@@ -228,6 +230,7 @@ class ELM_Detector {
 						(int) $existing_row->id,
 						$link_data['anchor_text']
 					);
+					$has_changes = true;
 				}
 				continue;
 			}
@@ -242,11 +245,19 @@ class ELM_Detector {
 					'anchor_text' => $link_data['anchor_text'],
 				)
 			);
+			$has_changes = true;
 		}
 
 		// --- Prune stale links ---
 		// delete_stale_links handles the "preserve overrides" logic internally.
-		ELM_DB::delete_stale_links( $post_id, $detected_hashes );
+		$deleted = ELM_DB::delete_stale_links( $post_id, $detected_hashes );
+		if ( ! empty( $deleted ) ) {
+			$has_changes = true;
+		}
+
+		if ( $has_changes ) {
+			ELM_Cache::invalidate_post( $post_id );
+		}
 	}
 
 	// ------------------------------------------------------------------
